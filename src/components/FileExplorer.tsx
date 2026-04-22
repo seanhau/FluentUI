@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState} from 'react';
 import {
   DataGrid,
   DataGridHeader,
@@ -18,6 +18,18 @@ import {
   TreeItemLayout,
   type TreeOpenChangeData,
   type TreeOpenChangeEvent,
+  Menu,
+  MenuTrigger,
+  MenuPopover,
+  MenuList,
+  MenuItem,
+  Dialog,
+  DialogSurface,
+  DialogTitle,
+  DialogBody,
+  DialogActions,
+  DialogContent,
+  Field,
 } from '@fluentui/react-components';
 import {
   Folder24Regular,
@@ -29,6 +41,12 @@ import {
   DocumentText24Regular,
   ArrowLeft24Regular,
   Home24Regular,
+  FolderAdd24Regular,
+  DocumentAdd24Regular,
+  LockClosed24Regular,
+  Person24Regular,
+  Shield24Regular,
+  Eye24Regular,
 } from '@fluentui/react-icons';
 
 const useStyles = makeStyles({
@@ -71,6 +89,35 @@ const useStyles = makeStyles({
     marginBottom: tokens.spacingVerticalS,
     color: tokens.colorNeutralForeground1,
   },
+  accessSection: {
+    marginBottom: tokens.spacingVerticalL,
+  },
+  accessSectionTitle: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    marginBottom: tokens.spacingVerticalS,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    color: tokens.colorNeutralForeground1,
+  },
+  userItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    padding: tokens.spacingVerticalS,
+    borderRadius: tokens.borderRadiusSmall,
+    backgroundColor: tokens.colorNeutralBackground2,
+    marginBottom: tokens.spacingVerticalXS,
+  },
+  userName: {
+    flexGrow: 1,
+    fontSize: tokens.fontSizeBase300,
+  },
+  userEmail: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+  },
 });
 
 interface FileItem {
@@ -84,6 +131,21 @@ interface FileItem {
   level: number;
   parentId?: string;
 }
+
+interface AccessUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'viewer';
+}
+
+const sampleAccessUsers: AccessUser[] = [
+  { id: '1', name: 'John Smith', email: 'john.smith@company.com', role: 'admin' },
+  { id: '2', name: 'Sarah Johnson', email: 'sarah.j@company.com', role: 'admin' },
+  { id: '3', name: 'Mike Davis', email: 'mike.davis@company.com', role: 'viewer' },
+  { id: '4', name: 'Emily Brown', email: 'emily.b@company.com', role: 'viewer' },
+  { id: '5', name: 'David Wilson', email: 'd.wilson@company.com', role: 'viewer' },
+];
 
 const sampleFileStructure: FileItem[] = [
   {
@@ -362,6 +424,119 @@ export const FileExplorer = () => {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<(string | null)[]>([null]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
+  const [showNewFileDialog, setShowNewFileDialog] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [fileStructure, setFileStructure] = useState<FileItem[]>(sampleFileStructure);
+  const [showManageAccessDialog, setShowManageAccessDialog] = useState(false);
+  const [accessUsers] = useState<AccessUser[]>(sampleAccessUsers);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    setContextMenuOpen(true);
+  };
+
+  const createNewFolder = () => {
+    if (!newItemName.trim()) return;
+    
+    const newFolder: FileItem = {
+      id: Date.now().toString(),
+      name: newItemName,
+      type: 'folder',
+      dateModified: new Date(),
+      size: 0,
+      kind: 'Folder',
+      level: currentFolder ? 1 : 0,
+      parentId: currentFolder || undefined,
+      children: [],
+    };
+
+    setFileStructure(prev => {
+      if (!currentFolder) {
+        return [...prev, newFolder];
+      }
+      
+      const addToFolder = (items: FileItem[]): FileItem[] => {
+        return items.map(item => {
+          if (item.id === currentFolder) {
+            return {
+              ...item,
+              children: [...(item.children || []), newFolder],
+            };
+          }
+          if (item.children) {
+            return {
+              ...item,
+              children: addToFolder(item.children),
+            };
+          }
+          return item;
+        });
+      };
+      
+      return addToFolder(prev);
+    });
+
+    setNewItemName('');
+    setShowNewFolderDialog(false);
+  };
+
+  const createNewFile = () => {
+    if (!newItemName.trim()) return;
+    
+    const extension = newItemName.split('.').pop()?.toLowerCase() || 'txt';
+    let kind = 'File';
+    
+    if (['ts', 'tsx'].includes(extension)) kind = 'TypeScript React';
+    else if (['js', 'jsx'].includes(extension)) kind = 'JavaScript';
+    else if (extension === 'css') kind = 'CSS Stylesheet';
+    else if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) kind = 'Image';
+    else if (extension === 'json') kind = 'JSON File';
+    else if (extension === 'md') kind = 'Markdown';
+
+    const newFile: FileItem = {
+      id: Date.now().toString(),
+      name: newItemName,
+      type: 'file',
+      dateModified: new Date(),
+      size: 0,
+      kind,
+      level: currentFolder ? 1 : 0,
+      parentId: currentFolder || undefined,
+    };
+
+    setFileStructure(prev => {
+      if (!currentFolder) {
+        return [...prev, newFile];
+      }
+      
+      const addToFolder = (items: FileItem[]): FileItem[] => {
+        return items.map(item => {
+          if (item.id === currentFolder) {
+            return {
+              ...item,
+              children: [...(item.children || []), newFile],
+            };
+          }
+          if (item.children) {
+            return {
+              ...item,
+              children: addToFolder(item.children),
+            };
+          }
+          return item;
+        });
+      };
+      
+      return addToFolder(prev);
+    });
+
+    setNewItemName('');
+    setShowNewFileDialog(false);
+  };
 
   const handleTreeOpenChange = (_: TreeOpenChangeEvent, data: TreeOpenChangeData) => {
     setExpandedFolders((prev) => {
@@ -397,7 +572,7 @@ export const FileExplorer = () => {
 
   const getCurrentFolderItems = (): FileItem[] => {
     if (!currentFolder) {
-      return sampleFileStructure;
+      return fileStructure;
     }
 
     const findFolder = (items: FileItem[], id: string): FileItem | undefined => {
@@ -411,7 +586,7 @@ export const FileExplorer = () => {
       return undefined;
     };
 
-    const folder = findFolder(sampleFileStructure, currentFolder);
+    const folder = findFolder(fileStructure, currentFolder);
     return folder?.children || [];
   };
 
@@ -443,7 +618,7 @@ export const FileExplorer = () => {
   };
 
   const items = getCurrentFolderItems();
-  const currentPath = buildPath(currentFolder, sampleFileStructure);
+  const currentPath = buildPath(currentFolder, fileStructure);
   const canGoBack = historyIndex > 0;
 
   const columns: TableColumnDefinition<FileItem>[] = [
@@ -517,7 +692,7 @@ export const FileExplorer = () => {
                 This PC
               </TreeItemLayout>
             </TreeItem>
-            {sampleFileStructure.filter(item => item.type === 'folder').map((node) => renderTreeItem(node))}
+            {fileStructure.filter(item => item.type === 'folder').map((node) => renderTreeItem(node))}
           </Tree>
         </div>
 
@@ -538,6 +713,14 @@ export const FileExplorer = () => {
               onClick={goHome}
               title="Home"
             />
+            <Button
+              appearance="subtle"
+              icon={<LockClosed24Regular />}
+              onClick={() => setShowManageAccessDialog(true)}
+              title="Manage Access"
+            >
+              Manage Access
+            </Button>
             <Input
               className={styles.addressBar}
               value={currentPath}
@@ -547,31 +730,157 @@ export const FileExplorer = () => {
           </div>
 
           {/* File Grid */}
-          <DataGrid
-            items={items}
-            columns={columns}
-            sortable
-            getRowId={(item) => item.id}
-            focusMode="composite"
-            style={{ minWidth: '100%' }}
-          >
-            <DataGridHeader>
-              <DataGridRow>
-                {({ renderHeaderCell }) => (
-                  <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
-                )}
-              </DataGridRow>
-            </DataGridHeader>
-            <DataGridBody<FileItem>>
-              {({ item, rowId }) => (
-                <DataGridRow<FileItem> key={rowId}>
-                  {({ renderCell }) => (
-                    <DataGridCell>{renderCell(item)}</DataGridCell>
+          <div onContextMenu={handleContextMenu}>
+            <DataGrid
+              items={items}
+              columns={columns}
+              sortable
+              getRowId={(item) => item.id}
+              focusMode="composite"
+              style={{ minWidth: '100%' }}
+            >
+              <DataGridHeader>
+                <DataGridRow>
+                  {({ renderHeaderCell }) => (
+                    <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
                   )}
                 </DataGridRow>
-              )}
-            </DataGridBody>
-          </DataGrid>
+              </DataGridHeader>
+              <DataGridBody<FileItem>>
+                {({ item, rowId }) => (
+                  <DataGridRow<FileItem> key={rowId}>
+                    {({ renderCell }) => (
+                      <DataGridCell>{renderCell(item)}</DataGridCell>
+                    )}
+                  </DataGridRow>
+                )}
+              </DataGridBody>
+            </DataGrid>
+          </div>
+
+          {/* Context Menu */}
+          <Menu open={contextMenuOpen} onOpenChange={(e, data) => setContextMenuOpen(data.open)}>
+            <MenuTrigger disableButtonEnhancement>
+              <div style={{ position: 'fixed', left: contextMenuPosition.x, top: contextMenuPosition.y, width: 0, height: 0 }} />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<FolderAdd24Regular />} onClick={() => { setShowNewFolderDialog(true); setContextMenuOpen(false); }}>
+                  New Folder
+                </MenuItem>
+                <MenuItem icon={<DocumentAdd24Regular />} onClick={() => { setShowNewFileDialog(true); setContextMenuOpen(false); }}>
+                  New File
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+
+          {/* New Folder Dialog */}
+          <Dialog open={showNewFolderDialog} onOpenChange={(e, data) => setShowNewFolderDialog(data.open)}>
+            <DialogSurface>
+              <DialogBody>
+                <DialogTitle>Create New Folder</DialogTitle>
+                <DialogContent>
+                  <Field label="Folder name">
+                    <Input
+                      value={newItemName}
+                      onChange={(e, data) => setNewItemName(data.value)}
+                      placeholder="New folder"
+                      onKeyDown={(e) => e.key === 'Enter' && createNewFolder()}
+                    />
+                  </Field>
+                </DialogContent>
+                <DialogActions>
+                  <Button appearance="secondary" onClick={() => { setShowNewFolderDialog(false); setNewItemName(''); }}>
+                    Cancel
+                  </Button>
+                  <Button appearance="primary" onClick={createNewFolder}>
+                    Create
+                  </Button>
+                </DialogActions>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
+
+          {/* New File Dialog */}
+          <Dialog open={showNewFileDialog} onOpenChange={(e, data) => setShowNewFileDialog(data.open)}>
+            <DialogSurface>
+              <DialogBody>
+                <DialogTitle>Create New File</DialogTitle>
+                <DialogContent>
+                  <Field label="File name">
+                    <Input
+                      value={newItemName}
+                      onChange={(e, data) => setNewItemName(data.value)}
+                      placeholder="newfile.txt"
+                      onKeyDown={(e) => e.key === 'Enter' && createNewFile()}
+                    />
+                  </Field>
+                </DialogContent>
+                <DialogActions>
+                  <Button appearance="secondary" onClick={() => { setShowNewFileDialog(false); setNewItemName(''); }}>
+                    Cancel
+                  </Button>
+                  <Button appearance="primary" onClick={createNewFile}>
+                    Create
+                  </Button>
+                </DialogActions>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
+
+          {/* Manage Access Dialog */}
+          <Dialog open={showManageAccessDialog} onOpenChange={(e, data) => setShowManageAccessDialog(data.open)}>
+            <DialogSurface style={{ maxWidth: '600px' }}>
+              <DialogBody>
+                <DialogTitle>Manage Access</DialogTitle>
+                <DialogContent>
+                  {/* Admin Access Section */}
+                  <div className={styles.accessSection}>
+                    <div className={styles.accessSectionTitle}>
+                      <Shield24Regular />
+                      <span>Admin Access</span>
+                    </div>
+                    {accessUsers
+                      .filter(user => user.role === 'admin')
+                      .map(user => (
+                        <div key={user.id} className={styles.userItem}>
+                          <Person24Regular />
+                          <div style={{ flexGrow: 1 }}>
+                            <div className={styles.userName}>{user.name}</div>
+                            <div className={styles.userEmail}>{user.email}</div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Viewer Access Section */}
+                  <div className={styles.accessSection}>
+                    <div className={styles.accessSectionTitle}>
+                      <Eye24Regular />
+                      <span>Viewer Access</span>
+                    </div>
+                    {accessUsers
+                      .filter(user => user.role === 'viewer')
+                      .map(user => (
+                        <div key={user.id} className={styles.userItem}>
+                          <Person24Regular />
+                          <div style={{ flexGrow: 1 }}>
+                            <div className={styles.userName}>{user.name}</div>
+                            <div className={styles.userEmail}>{user.email}</div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </DialogContent>
+                <DialogActions>
+                  <Button appearance="primary" onClick={() => setShowManageAccessDialog(false)}>
+                    Close
+                  </Button>
+                </DialogActions>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
         </div>
       </div>
     </div>
