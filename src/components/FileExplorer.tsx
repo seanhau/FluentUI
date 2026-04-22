@@ -130,6 +130,8 @@ interface FileItem {
   children?: FileItem[];
   level: number;
   parentId?: string;
+  isDocument?: boolean;
+  documentData?: any;
 }
 
 interface AccessUser {
@@ -148,6 +150,141 @@ const sampleAccessUsers: AccessUser[] = [
 ];
 
 const sampleFileStructure: FileItem[] = [
+  {
+    id: 'docs',
+    name: 'Documents',
+    type: 'folder',
+    dateModified: new Date('2024-03-25T10:00:00'),
+    size: 0,
+    kind: 'Folder',
+    level: 0,
+    children: [
+      {
+        id: 'doc-1',
+        name: 'Quality Assurance Protocol.docx',
+        type: 'file',
+        dateModified: new Date('2024-03-25T14:30:00'),
+        size: 45678,
+        kind: 'Document',
+        level: 1,
+        parentId: 'docs',
+        isDocument: true,
+        documentData: {
+          id: 'doc-1',
+          title: 'Quality Assurance Protocol',
+          sections: [
+            {
+              id: '1',
+              title: 'Document Information',
+              content: 'Document Title: Quality Assurance Protocol\nVersion: 2.1\nDate: March 25, 2024\nAuthor: QA Department\nApproved By: John Smith',
+              type: 'text',
+            },
+            {
+              id: '2',
+              title: 'Objective',
+              content: 'This document outlines the quality assurance procedures and protocols to ensure all products meet the required standards and specifications before release.',
+              type: 'text',
+            },
+            {
+              id: '3',
+              title: 'Test Cases',
+              type: 'table',
+              table: {
+                id: 't1',
+                columns: ['Test ID', 'Test Description', 'Expected Result', 'Status', 'Tester'],
+                rows: [
+                  ['QA-001', 'Verify product dimensions', 'All dimensions within ±0.5mm tolerance', 'Passed', 'Sarah Johnson'],
+                  ['QA-002', 'Check material composition', 'Material matches specification sheet', 'Passed', 'Mike Davis'],
+                  ['QA-003', 'Perform stress test', 'Product withstands 150% rated load', 'In Progress', 'Emily Brown'],
+                ],
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: 'doc-2',
+        name: 'Manufacturing Procedures.docx',
+        type: 'file',
+        dateModified: new Date('2024-03-24T11:15:00'),
+        size: 67890,
+        kind: 'Document',
+        level: 1,
+        parentId: 'docs',
+        isDocument: true,
+        documentData: {
+          id: 'doc-2',
+          title: 'Manufacturing Procedures',
+          sections: [
+            {
+              id: '1',
+              title: 'Cover Page',
+              content: 'Document Title: Manufacturing Procedures\nVersion: 3.0\nDate: March 24, 2024\nDepartment: Manufacturing\nReviewed By: David Wilson',
+              type: 'text',
+            },
+            {
+              id: '2',
+              title: 'Operating Procedures',
+              type: 'table',
+              table: {
+                id: 't1',
+                columns: ['Step', 'Procedure', 'Expected Result', 'Actual Result', 'Pass/Fail', 'Operator'],
+                rows: [
+                  ['1', 'Verify all raw materials are in stock', 'All materials available and within expiry date', '', '', ''],
+                  ['2', 'Set up manufacturing equipment', 'Equipment calibrated and ready', '', '', ''],
+                  ['3', 'Begin production run', 'First article inspection passed', '', '', ''],
+                  ['4', 'Quality check at 50% completion', 'All measurements within tolerance', '', '', ''],
+                ],
+              },
+            },
+            {
+              id: '3',
+              title: 'Safety Requirements',
+              content: '1. All operators must wear appropriate PPE\n2. Emergency stop buttons must be tested daily\n3. Work area must be kept clean and organized\n4. Report any equipment malfunctions immediately',
+              type: 'text',
+            },
+          ],
+        },
+      },
+      {
+        id: 'doc-3',
+        name: 'Equipment Validation Report.docx',
+        type: 'file',
+        dateModified: new Date('2024-03-23T16:45:00'),
+        size: 34567,
+        kind: 'Document',
+        level: 1,
+        parentId: 'docs',
+        isDocument: true,
+        documentData: {
+          id: 'doc-3',
+          title: 'Equipment Validation Report',
+          sections: [
+            {
+              id: '1',
+              title: 'Executive Summary',
+              content: 'This report documents the validation of Equipment Model XYZ-2000 installed in Production Line A. All validation tests have been completed successfully.',
+              type: 'text',
+            },
+            {
+              id: '2',
+              title: 'Validation Test Results',
+              type: 'table',
+              table: {
+                id: 't1',
+                columns: ['Test ID', 'Description', 'Acceptance Criteria', 'Result', 'Date', 'Validator'],
+                rows: [
+                  ['VAL-001', 'Installation Qualification', 'Equipment installed per specifications', 'Pass', '2024-03-20', 'John Smith'],
+                  ['VAL-002', 'Operational Qualification', 'All functions operate correctly', 'Pass', '2024-03-21', 'Sarah Johnson'],
+                  ['VAL-003', 'Performance Qualification', 'Meets production requirements', 'Pass', '2024-03-22', 'Mike Davis'],
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  },
   {
     id: '1',
     name: 'src',
@@ -418,9 +555,13 @@ const buildPath = (folderId: string | null, allItems: FileItem[]): string => {
   return 'This PC > ' + path.join(' > ');
 };
 
-export const FileExplorer = () => {
+interface FileExplorerProps {
+  onDocumentOpen?: (documentData: any) => void;
+}
+
+export const FileExplorer = ({ onDocumentOpen }: FileExplorerProps) => {
   const styles = useStyles();
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['1']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['1', 'docs']));
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<(string | null)[]>([null]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -628,6 +769,7 @@ export const FileExplorer = () => {
       renderHeaderCell: () => 'Name',
       renderCell: (item) => {
         const isFolder = item.type === 'folder';
+        const isClickable = isFolder || item.isDocument;
 
         return (
           <TableCellLayout
@@ -638,8 +780,14 @@ export const FileExplorer = () => {
             }
           >
             <span
-              style={{ cursor: isFolder ? 'pointer' : 'default' }}
-              onClick={() => isFolder && navigateToFolder(item.id)}
+              style={{ cursor: isClickable ? 'pointer' : 'default', color: item.isDocument ? tokens.colorBrandForeground1 : 'inherit' }}
+              onClick={() => {
+                if (isFolder) {
+                  navigateToFolder(item.id);
+                } else if (item.isDocument && item.documentData && onDocumentOpen) {
+                  onDocumentOpen(item.documentData);
+                }
+              }}
             >
               {item.name}
             </span>

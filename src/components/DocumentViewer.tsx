@@ -138,72 +138,83 @@ const useStyles = makeStyles({
   },
 });
 
-interface TableData {
+export interface TableData {
   id: string;
   columns: string[];
   rows: string[][];
 }
 
-interface TextSection {
+export interface TextSection {
   id: string;
   title: string;
   content: string;
   type: 'text';
 }
 
-interface TableSection {
+export interface TableSection {
   id: string;
   title: string;
   type: 'table';
   table: TableData;
 }
 
-type Section = TextSection | TableSection;
+export type Section = TextSection | TableSection;
 
-export const DocumentViewer = () => {
+interface DocumentViewerProps {
+  documentData?: {
+    id: string;
+    title: string;
+    sections: Section[];
+  };
+  onClose?: () => void;
+}
+
+const defaultSections: Section[] = [
+  {
+    id: '1',
+    title: 'Cover Page',
+    content: 'Document Title: World Building Guide\nVersion: 1.0\nDate: 2024\nAuthor: Your Name',
+    type: 'text',
+  },
+  {
+    id: '2',
+    title: 'Table of Contents',
+    content: '1. Objective\n2. Scope\n3. Pre-Requisites\n4. Test Cases\n5. Operating Procedures\n6. References',
+    type: 'text',
+  },
+  {
+    id: '3',
+    title: 'Operating Procedures',
+    type: 'table',
+    table: {
+      id: 't1',
+      columns: ['#', 'Procedure', 'Expected Result', 'Actual Result', 'Pass/Fail', 'Signature', 'Witness'],
+      rows: [
+        ['1', 'Verify all Current Quality and Manufacturing Supporting Procedures have been reviewed', 'All Current Quality and Manufacturing Supporting Procedures have been reviewed', '', '', '', ''],
+        ['2', '', '', '', '', '', ''],
+        ['3', '', '', '', '', '', ''],
+      ],
+    },
+  },
+  {
+    id: '4',
+    title: 'Test Information',
+    type: 'table',
+    table: {
+      id: 't2',
+      columns: ['Test ID', 'Test Description', 'Acceptance Criteria', 'Specification Reference', 'Risk Assessment Reference'],
+      rows: [
+        ['IQ-EQ-003-02-TC-001', 'To verify that applicable evidence is attached to show that applicable procedures have been established or updated for the inclusion of the new BIG-PM-01', 'Valid evidence/procedures have been established or updated for the inclusion of the new BIG-PM-01', 'XIX-534', ''],
+      ],
+    },
+  },
+];
+
+export const DocumentViewer = ({ documentData, onClose }: DocumentViewerProps) => {
   const styles = useStyles();
   const [activeTab, setActiveTab] = useState<'contents' | 'issues'>('contents');
   const [activeSection, setActiveSection] = useState<string>('1');
-  const [sections, setSections] = useState<Section[]>([
-    {
-      id: '1',
-      title: 'Cover Page',
-      content: 'Document Title: World Building Guide\nVersion: 1.0\nDate: 2024\nAuthor: Your Name',
-      type: 'text',
-    },
-    {
-      id: '2',
-      title: 'Table of Contents',
-      content: '1. Objective\n2. Scope\n3. Pre-Requisites\n4. Test Cases\n5. Operating Procedures\n6. References',
-      type: 'text',
-    },
-    {
-      id: '3',
-      title: 'Operating Procedures',
-      type: 'table',
-      table: {
-        id: 't1',
-        columns: ['#', 'Procedure', 'Expected Result', 'Actual Result', 'Pass/Fail', 'Signature', 'Witness'],
-        rows: [
-          ['1', 'Verify all Current Quality and Manufacturing Supporting Procedures have been reviewed', 'All Current Quality and Manufacturing Supporting Procedures have been reviewed', '', '', '', ''],
-          ['2', '', '', '', '', '', ''],
-          ['3', '', '', '', '', '', ''],
-        ],
-      },
-    },
-    {
-      id: '4',
-      title: 'Test Information',
-      type: 'table',
-      table: {
-        id: 't2',
-        columns: ['Test ID', 'Test Description', 'Acceptance Criteria', 'Specification Reference', 'Risk Assessment Reference'],
-        rows: [
-          ['IQ-EQ-003-02-TC-001', 'To verify that applicable evidence is attached to show that applicable procedures have been established or updated for the inclusion of the new BIG-PM-01', 'Valid evidence/procedures have been established or updated for the inclusion of the new BIG-PM-01', 'XIX-534', ''],
-        ],
-      },
-    },
-  ]);
+  const [sections, setSections] = useState<Section[]>(documentData?.sections || defaultSections);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -325,6 +336,14 @@ export const DocumentViewer = () => {
       {/* Main Content */}
       <div className={styles.mainContent}>
         <div className={styles.toolbar}>
+          {onClose && (
+            <Button
+              appearance="secondary"
+              onClick={onClose}
+            >
+              ← Back to Files
+            </Button>
+          )}
           <Button
             appearance="primary"
             icon={<DocumentText24Regular />}
