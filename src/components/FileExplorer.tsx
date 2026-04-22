@@ -13,9 +13,15 @@ import {
   Input,
   makeStyles,
   tokens,
+  Tree,
+  TreeItem,
+  TreeItemLayout,
+  type TreeOpenChangeData,
+  type TreeOpenChangeEvent,
 } from '@fluentui/react-components';
 import {
   Folder24Regular,
+  FolderOpen24Regular,
   Document24Regular,
   DocumentJavascript24Regular,
   DocumentCss24Regular,
@@ -26,6 +32,26 @@ import {
 } from '@fluentui/react-icons';
 
 const useStyles = makeStyles({
+  container: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalM,
+    width: '100%',
+    maxWidth: '1400px',
+  },
+  sidebar: {
+    width: '250px',
+    minWidth: '250px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    padding: tokens.spacingVerticalM,
+    maxHeight: '600px',
+    overflowY: 'auto',
+  },
+  mainContent: {
+    flexGrow: 1,
+    minWidth: 0,
+  },
   navigationBar: {
     display: 'flex',
     alignItems: 'center',
@@ -38,6 +64,12 @@ const useStyles = makeStyles({
   },
   addressBar: {
     flexGrow: 1,
+  },
+  sidebarTitle: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    marginBottom: tokens.spacingVerticalS,
+    color: tokens.colorNeutralForeground1,
   },
 });
 
@@ -295,7 +327,7 @@ const formatDate = (date: Date): string => {
 
 // Helper function to build path from root to current folder
 const buildPath = (folderId: string | null, allItems: FileItem[]): string => {
-  if (!folderId) return 'Root';
+  if (!folderId) return 'This PC';
   
   const path: string[] = [];
   let currentId: string | undefined = folderId;
@@ -321,15 +353,27 @@ const buildPath = (folderId: string | null, allItems: FileItem[]): string => {
     }
   }
   
-  return 'Root > ' + path.join(' > ');
+  return 'This PC > ' + path.join(' > ');
 };
 
 export const FileExplorer = () => {
   const styles = useStyles();
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['1']));
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<(string | null)[]>([null]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
+  const handleTreeOpenChange = (_: TreeOpenChangeEvent, data: TreeOpenChangeData) => {
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev);
+      if (data.open) {
+        newSet.add(data.value as string);
+      } else {
+        newSet.delete(data.value as string);
+      }
+      return newSet;
+    });
+  };
 
   const navigateToFolder = (folderId: string | null) => {
     setCurrentFolder(folderId);
@@ -369,6 +413,33 @@ export const FileExplorer = () => {
 
     const folder = findFolder(sampleFileStructure, currentFolder);
     return folder?.children || [];
+  };
+
+  const renderTreeItem = (node: FileItem) => {
+    const isOpen = expandedFolders.has(node.id);
+    
+    if (node.type === 'folder') {
+      return (
+        <TreeItem
+          key={node.id}
+          itemType="branch"
+          value={node.id}
+        >
+          <TreeItemLayout
+            iconBefore={isOpen ? <FolderOpen24Regular /> : <Folder24Regular />}
+            onClick={() => navigateToFolder(node.id)}
+            style={{ cursor: 'pointer' }}
+          >
+            {node.name}
+          </TreeItemLayout>
+          <Tree>
+            {node.children?.filter(child => child.type === 'folder').map((child) => renderTreeItem(child))}
+          </Tree>
+        </TreeItem>
+      );
+    }
+
+    return <></>;
   };
 
   const items = getCurrentFolderItems();
@@ -422,58 +493,87 @@ export const FileExplorer = () => {
   ];
 
   return (
-    <div style={{ width: '100%', maxWidth: '1200px' }}>
+    <div style={{ width: '100%' }}>
       <h2 style={{ marginBottom: '16px' }}>File Explorer</h2>
       
-      {/* Navigation Bar */}
-      <div className={styles.navigationBar}>
-        <Button
-          appearance="subtle"
-          icon={<ArrowLeft24Regular />}
-          onClick={goBack}
-          disabled={!canGoBack}
-          title="Back"
-        />
-        <Button
-          appearance="subtle"
-          icon={<Home24Regular />}
-          onClick={goHome}
-          title="Home"
-        />
-        <Input
-          className={styles.addressBar}
-          value={currentPath}
-          readOnly
-          contentBefore={<Folder24Regular />}
-        />
-      </div>
+      <div className={styles.container}>
+        {/* Sidebar with folder tree */}
+        <div className={styles.sidebar}>
+          <div className={styles.sidebarTitle}>Folders</div>
+          <Tree
+            aria-label="Folder Navigation"
+            openItems={expandedFolders}
+            onOpenChange={handleTreeOpenChange}
+          >
+            <TreeItem
+              itemType="leaf"
+              value="root"
+            >
+              <TreeItemLayout
+                iconBefore={<Home24Regular />}
+                onClick={goHome}
+                style={{ cursor: 'pointer', fontWeight: currentFolder === null ? 'bold' : 'normal' }}
+              >
+                This PC
+              </TreeItemLayout>
+            </TreeItem>
+            {sampleFileStructure.filter(item => item.type === 'folder').map((node) => renderTreeItem(node))}
+          </Tree>
+        </div>
 
-      {/* File Grid */}
-      <DataGrid
-        items={items}
-        columns={columns}
-        sortable
-        getRowId={(item) => item.id}
-        focusMode="composite"
-        style={{ minWidth: '100%' }}
-      >
-        <DataGridHeader>
-          <DataGridRow>
-            {({ renderHeaderCell }) => (
-              <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
-            )}
-          </DataGridRow>
-        </DataGridHeader>
-        <DataGridBody<FileItem>>
-          {({ item, rowId }) => (
-            <DataGridRow<FileItem> key={rowId}>
-              {({ renderCell }) => (
-                <DataGridCell>{renderCell(item)}</DataGridCell>
+        {/* Main content area */}
+        <div className={styles.mainContent}>
+          {/* Navigation Bar */}
+          <div className={styles.navigationBar}>
+            <Button
+              appearance="subtle"
+              icon={<ArrowLeft24Regular />}
+              onClick={goBack}
+              disabled={!canGoBack}
+              title="Back"
+            />
+            <Button
+              appearance="subtle"
+              icon={<Home24Regular />}
+              onClick={goHome}
+              title="Home"
+            />
+            <Input
+              className={styles.addressBar}
+              value={currentPath}
+              readOnly
+              contentBefore={<Folder24Regular />}
+            />
+          </div>
+
+          {/* File Grid */}
+          <DataGrid
+            items={items}
+            columns={columns}
+            sortable
+            getRowId={(item) => item.id}
+            focusMode="composite"
+            style={{ minWidth: '100%' }}
+          >
+            <DataGridHeader>
+              <DataGridRow>
+                {({ renderHeaderCell }) => (
+                  <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
+                )}
+              </DataGridRow>
+            </DataGridHeader>
+            <DataGridBody<FileItem>>
+              {({ item, rowId }) => (
+                <DataGridRow<FileItem> key={rowId}>
+                  {({ renderCell }) => (
+                    <DataGridCell>{renderCell(item)}</DataGridCell>
+                  )}
+                </DataGridRow>
               )}
-            </DataGridRow>
-          )}
-        </DataGridBody>
-      </DataGrid>
+            </DataGridBody>
+          </DataGrid>
+        </div>
+      </div>
     </div>
   );
 };
